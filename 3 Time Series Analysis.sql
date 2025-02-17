@@ -7,7 +7,7 @@
 /*
 Nota
 Cual es la diferencia entre el tipo de datos datetime y timestamp en mysql? 
-Meta: En MySQL, tanto el tipo de dato DATETIME como TIMESTAMP se utilizan para almacenar fechas y horas, 
+En MySQL, tanto el tipo de dato DATETIME como TIMESTAMP se utilizan para almacenar fechas y horas, 
 pero hay algunas diferencias importantes entre ellos:
 DATETIME:
 - Almacena fechas y horas en un formato específico (AAAA-MM-DD HH:MM:SS)
@@ -23,7 +23,6 @@ TIMESTAMP:
 - Requiere 4 bytes de almacenamiento
 En resumen, la principal diferencia entre DATETIME y TIMESTAMP es que TIMESTAMP tiene zona horaria asociada y se puede configurar para actualizarse 
 automáticamente, mientras que DATETIME no tiene zona horaria asociada y no se actualiza automáticamente.
-¿Quieres saber más sobre cómo configurar un campo TIMESTAMP en MySQL para que se actualice automáticamente?
 Según la experiencia y las prácticas comunes en la industria, el tipo de dato más utilizado en MySQL es DATETIME.
 Hay varias razones por las que DATETIME es más popular:
 1. Flexibilidad: DATETIME permite almacenar fechas y horas en cualquier rango, desde 1000-01-01 00:00:00 hasta 9999-12-31 23:59:59.
