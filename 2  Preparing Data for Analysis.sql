@@ -2,7 +2,7 @@
 
 /*
 STRING:
-	CHAR: Longitud fija
+	CHAR: Longitud fija 
 	VARCHAR: Longitud variables. Hasta 256 caracteres.
 	TEXT/BLOB: Grandes longitudes de datos como cartas, mails, reseñas, comentarios.
 NUMERICO:
