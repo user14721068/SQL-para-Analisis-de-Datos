@@ -118,5 +118,213 @@ periodo	nro_clientes	clientes_iniciales	porcentaje_retencion
 
 /* 4-4 Analisis de Retencion Legisladores */
 
+SELECT 	* 
+FROM 	cohort.legisladoresusa
+LIMIT 	5;
+/**
+legisladoresusa_id	IDLegislador	DipSen	InicioPeriodo	FinPeriodo	Estado
+1	B000944	rep	1993-01-05 00:00:00	1995-01-03 00:00:00	OH
+2	C000127	rep	1993-01-05 00:00:00	1995-01-03 00:00:00	WA
+3	C000141	rep	1987-01-06 00:00:00	1989-01-03 00:00:00	MD
+4	C000174	rep	1983-01-03 00:00:00	1985-01-03 00:00:00	DE
+5	C001070	sen	2007-01-04 00:00:00	2013-01-03 00:00:00	PA
+...
+*/
+
+SELECT 	* 
+FROM 	cohort.tablafechas
+LIMIT 	5;
+/*
+Year	Mes	Dia	Dias_en_Year
+1770	12	31	365
+1771	12	31	365
+1772	12	31	366
+1773	12	31	365
+1774	12	31	365
+...
+*/
+
+/*Agregar una columna de fecha*/
+ALTER TABLE cohort.tablafechas ADD COLUMN Fecha DATE;
+UPDATE cohort.tablafechas SET cohort.tablafechas.Fecha = concat(Year,"-",Mes,"-",Dia);
+
+SELECT 	* 
+FROM 	cohort.tablafechas
+LIMIT 	5;
+/*
+Year	Mes	Dia	Dias_en_Year	Fecha
+1770	12	31	365	1770-12-31
+1771	12	31	365	1771-12-31
+1772	12	31	366	1772-12-31
+1773	12	31	365	1773-12-31
+1774	12	31	365	1774-12-31
+...
+*/
+
+/* Cuando inicia cada legislador su periodo */
+SELECT 	IDLegislador,
+		MIN(InicioPeriodo) as Primer_Periodo
+FROM cohort.legisladoresusa
+GROUP BY 1;
+/*
+IDLegislador	Primer_Periodo
+B000944	1993-01-05 00:00:00
+C000127	1993-01-05 00:00:00
+C000141	1987-01-06 00:00:00
+C000174	1983-01-03 00:00:00
+C001070	2007-01-04 00:00:00
+...
+*/
+
+/* Agregar la fecha de primer periodo a la tabla original */
+SELECT *
+FROM
+(
+SELECT 	IDLegislador,
+		MIN(InicioPeriodo) as Primer_Periodo
+FROM cohort.legisladoresusa
+GROUP BY 1
+) AS A 
+INNER JOIN cohort.legisladoresusa AS B ON A.IDLegislador=B.IDLegislador;
+/*
+IDLegislador	Primer_Periodo	legisladoresusa_id	IDLegislador	DipSen	InicioPeriodo	FinPeriodo	Estado
+B000944	1993-01-05 00:00:00	1	B000944	rep	1993-01-05 00:00:00	1995-01-03 00:00:00	OH
+C000127	1993-01-05 00:00:00	2	C000127	rep	1993-01-05 00:00:00	1995-01-03 00:00:00	WA
+C000141	1987-01-06 00:00:00	3	C000141	rep	1987-01-06 00:00:00	1989-01-03 00:00:00	MD
+C000174	1983-01-03 00:00:00	4	C000174	rep	1983-01-03 00:00:00	1985-01-03 00:00:00	DE
+C001070	2007-01-04 00:00:00	5	C001070	sen	2007-01-04 00:00:00	2013-01-03 00:00:00	PA
+...
+*/
+
+/*Usar la tabla de fechas para agregar las fechas intermedias entre InicioPeriodo y FinPeriodo y calcular el periodo */
+SELECT 	A.IDLegislador,
+		A.Primer_Periodo,
+        B.InicioPeriodo,
+        B.FinPeriodo,
+        C.Fecha,
+		COALESCE(timestampdiff(YEAR,A.primer_periodo,C.fecha),0) as Periodo
+FROM
+(
+SELECT 	IDLegislador,
+		MIN(InicioPeriodo) as Primer_Periodo
+FROM cohort.legisladoresusa
+GROUP BY 1
+) AS A 
+INNER JOIN cohort.legisladoresusa AS B ON A.IDLegislador=B.IDLegislador
+LEFT JOIN cohort.tablafechas AS C ON C.FECHA BETWEEN B.InicioPeriodo AND B.FInPeriodo
+ORDER BY A.IDLegislador, B.InicioPeriodo, C.Fecha;
+/*
+IDLegislador	Primer_Periodo	InicioPeriodo	FinPeriodo	Fecha	Periodo
+A000001	1951-01-03 00:00:00	1951-01-03 00:00:00	1953-01-03 00:00:00	1951-12-31	0
+A000001	1951-01-03 00:00:00	1951-01-03 00:00:00	1953-01-03 00:00:00	1952-12-31	1
+A000002	1947-01-03 00:00:00	1947-01-03 00:00:00	1949-01-03 00:00:00	1947-12-31	0
+A000002	1947-01-03 00:00:00	1947-01-03 00:00:00	1949-01-03 00:00:00	1948-12-31	1
+A000002	1947-01-03 00:00:00	1949-01-03 00:00:00	1951-01-03 00:00:00	1949-12-31	2
+A000002	1947-01-03 00:00:00	1949-01-03 00:00:00	1951-01-03 00:00:00	1950-12-31	3
+...
+*/
+
+
+/* Con la columna periodo calculada en el punto anterior, calcular el numero de legisladores en cada uno de los periodos */
+SELECT 	Periodo,
+		count(distinct IDLegislador) as numero_legisladores
+FROM
+(
+SELECT 	A.IDLegislador,
+		A.Primer_Periodo,
+        B.InicioPeriodo,
+        B.FinPeriodo,
+        C.Fecha,
+		COALESCE(timestampdiff(YEAR,A.primer_periodo,C.fecha),0) as Periodo
+FROM
+(
+SELECT 	IDLegislador,
+		MIN(InicioPeriodo) as Primer_Periodo
+FROM cohort.legisladoresusa
+GROUP BY 1
+) AS A 
+INNER JOIN cohort.legisladoresusa AS B ON A.IDLegislador=B.IDLegislador
+LEFT JOIN cohort.tablafechas AS C ON C.FECHA BETWEEN B.InicioPeriodo AND B.FInPeriodo
+ORDER BY A.IDLegislador, B.InicioPeriodo, C.Fecha
+) AS M
+GROUP BY 1
+ORDER BY 1 ASC;
+/* 
+Periodo	numero_legisladores
+NULL	137
+0	12501
+1	12328
+2	8162
+3	8065
+...
+*/
+
+/* De la tabla anterior, calcular una columna con el porcentaje de retencion respecto del periodo 0 */
+SELECT 	periodo,
+		numero_legisladores,
+        first_value(numero_legisladores) over (order by periodo) as poblacion_inicial,
+		100*(numero_legisladores / first_value(numero_legisladores) over (order by periodo)) as porcentaje_retencion
+FROM
+(
+SELECT 	Periodo,
+		count(distinct IDLegislador) as numero_legisladores
+FROM
+(
+SELECT 	A.IDLegislador,
+		A.Primer_Periodo,
+        B.InicioPeriodo,
+        B.FinPeriodo,
+        C.Fecha,
+		COALESCE(timestampdiff(YEAR,A.primer_periodo,C.fecha),0) as Periodo
+FROM
+(
+SELECT 	IDLegislador,
+		MIN(InicioPeriodo) as Primer_Periodo
+FROM cohort.legisladoresusa
+GROUP BY 1
+) AS A 
+INNER JOIN cohort.legisladoresusa AS B ON A.IDLegislador=B.IDLegislador
+LEFT JOIN cohort.tablafechas AS C ON C.FECHA BETWEEN B.InicioPeriodo AND B.FInPeriodo
+ORDER BY A.IDLegislador, B.InicioPeriodo, C.Fecha
+) AS M
+GROUP BY 1
+ORDER BY 1 ASC
+) AS N
+/*
+periodo	numero_legisladores	poblacion_inicial	porcentaje_retencion
+0	12518	12518	100.0000
+1	12328	12518	98.4822
+2	8162	12518	65.2021
+3	8065	12518	64.4272
+4	5854	12518	46.7647
+5	5787	12518	46.2294
+...
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
