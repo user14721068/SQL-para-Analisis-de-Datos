@@ -266,30 +266,30 @@ SELECT 	periodo,
 		100*(numero_legisladores / first_value(numero_legisladores) over (order by periodo)) as porcentaje_retencion
 FROM
 (
-SELECT 	Periodo,
-		count(distinct IDLegislador) as numero_legisladores
-FROM
-(
-SELECT 	A.IDLegislador,
-		A.Primer_Periodo,
-        B.InicioPeriodo,
-        B.FinPeriodo,
-        C.Fecha,
-		COALESCE(timestampdiff(YEAR,A.primer_periodo,C.fecha),0) as Periodo
-FROM
-(
-SELECT 	IDLegislador,
-		MIN(InicioPeriodo) as Primer_Periodo
-FROM cohort.legisladoresusa
-GROUP BY 1
-) AS A 
-INNER JOIN cohort.legisladoresusa AS B ON A.IDLegislador=B.IDLegislador
-LEFT JOIN cohort.tablafechas AS C ON C.FECHA BETWEEN B.InicioPeriodo AND B.FInPeriodo
-ORDER BY A.IDLegislador, B.InicioPeriodo, C.Fecha
+		SELECT 	Periodo,
+				count(distinct IDLegislador) as numero_legisladores
+		FROM
+		(
+				SELECT 	A.IDLegislador,
+						A.Primer_Periodo,
+						B.InicioPeriodo,
+						B.FinPeriodo,
+						C.Fecha,
+						COALESCE(timestampdiff(YEAR,A.primer_periodo,C.fecha),0) as Periodo
+				FROM
+				(
+						SELECT 	IDLegislador,
+								MIN(InicioPeriodo) as Primer_Periodo
+						FROM cohort.legisladoresusa
+						GROUP BY 1
+		) AS A 
+		INNER JOIN cohort.legisladoresusa AS B ON A.IDLegislador=B.IDLegislador
+		LEFT JOIN cohort.tablafechas AS C ON C.FECHA BETWEEN B.InicioPeriodo AND B.FInPeriodo
+		ORDER BY A.IDLegislador, B.InicioPeriodo, C.Fecha
 ) AS M
 GROUP BY 1
 ORDER BY 1 ASC
-) AS N
+) AS N;
 /*
 periodo	numero_legisladores	poblacion_inicial	porcentaje_retencion
 0	12518	12518	100.0000
@@ -303,28 +303,151 @@ periodo	numero_legisladores	poblacion_inicial	porcentaje_retencion
 
 
 
+/* 4-5 Cohortes derivadas de la serie de tiempo */
 
+/* De la tabla "Supertienda" obtener los clientes y la fecha de su primera orden */
+select		nombre_cliente,
+			min(fecha_orden) as primera_orden
+from cohort.supertienda
+group by 1;
+/*
+nombre_cliente	primera_orden
+Darren Powers	2019-01-03
+Phillina Ober	2019-01-04
+Mick Brown	2019-01-05
+Maria Etezadi	2019-01-06
+Jack O'Briant	2019-01-06
+...
+*/
 
+/* Obtener el año de la primera orden y a partir de su primera orden calcular cuantos clientes regresaron 1 mes despues, 2 meses despues, ..., n meses despues */
+select	extract(year from primera_orden) as primer_anio,
+		timestampdiff(month, a.primera_orden, b.fecha_orden) as periodo,
+        count(distinct a.nombre_cliente) as clientes_retenidos
+from
+(	select		nombre_cliente,
+				min(fecha_orden) as primera_orden
+	from cohort.supertienda
+	group by 1
+) as a
+inner join cohort.supertienda as b on a.nombre_cliente = b.Nombre_Cliente
+group by 1,2;
+/*
+primer_anio	periodo	clientes_retenidos
+2019	0	605
+2019	1	51
+2019	2	51
+2019	3	51
+2019	4	37
+2019	5	68
+...
+*/
 
+/* Usando la consulta anterior, calcular el porcentaje de retención respecto del periodo 0 */
+select 	primer_anio,
+		periodo, 
+        clientes_retenidos,
+        first_value(clientes_retenidos) over (partition by primer_anio order by periodo) as tamanio_cohorte,
+        100 * clientes_retenidos / first_value(clientes_retenidos) over (partition by primer_anio order by periodo) as porcentaje_retencion
+from
+(
+select	extract(year from primera_orden) as primer_anio,
+		timestampdiff(month, a.primera_orden, b.fecha_orden) as periodo,
+        count(distinct a.nombre_cliente) as clientes_retenidos
+from
+(	select		nombre_cliente,
+				min(fecha_orden) as primera_orden
+	from cohort.supertienda
+	group by 1
+) as a
+inner join cohort.supertienda as b on a.nombre_cliente = b.Nombre_Cliente
+group by 1,2
+) as b;
+/*
+primer_anio	periodo	clientes_retenidos	tamanio_cohorte	porcentaje_retencion
+2019	0	605	605	100.0000
+2019	1	51	605	8.4298
+2019	2	51	605	8.4298
+2019	3	51	605	8.4298
+2019	4	37	605	6.1157
+...
+*/
 
+/* Generar una cohorte con la categoria de la primera compra de los clientes */
 
+/* Obtener la categoria de la primera compra que hizo cada cliente */
+select 	nombre_cliente,
+		min(fecha_orden) as primera_orden,
+        first_value(categoria) over (partition by nombre_cliente order by fecha_orden) as categoria_primera_compra
+from 	cohort.supertienda
+group by 1;
+/*
+nombre_cliente	primera_orden	categoria_primera_compra
+Aaron Bergman	2019-02-18	Suministros de Oficina
+Aaron Hawkins	2019-04-22	Suministros de Oficina
+Aaron Smayling	2019-07-27	Suministros de Oficina
+Adam Bellavance	2020-09-18	Suministros de Oficina
+Adam Hart	2019-11-16	Suministros de Oficina
+...
+*/
 
+/* Con la consulta anterior, agrupar por categoria_primera_compra y periodo de compra, y obtener el total de clientes retenidos */
+select 	categoria_primera_compra,
+		timestampdiff(month, a.primera_orden, b.fecha_orden) as periodo,
+        count(distinct a.nombre_cliente) as clientes_retenidos
+from
+(
+	select 	nombre_cliente,
+			min(fecha_orden) as primera_orden,
+			first_value(categoria) over (partition by nombre_cliente order by fecha_orden) as categoria_primera_compra
+	from 	cohort.supertienda
+	group by 1
+) as a
+inner join cohort.supertienda as b on a.nombre_cliente=b.nombre_cliente
+group by 1,2;
+/*
+categoria_primera_compra	periodo	clientes_retenidos
+Muebles	0	285
+Muebles	1	23
+Muebles	2	22
+Muebles	3	25
+Muebles	4	22
+Muebles	5	27
+...
+*/
 
+/* Con la consulta anterior obtener el porcentaj de retencion respecto del periodo 0 */
+select 	categoria_primera_compra,
+		periodo,
+		clientes_retenidos,
+        first_value(clientes_retenidos) over (partition by categoria_primera_compra order by periodo) as tamanio_cohorte,
+        100 * clientes_retenidos / first_value(clientes_retenidos) over (partition by categoria_primera_compra order by periodo) as porcentaje_retencion
+from
+(
+	select 	categoria_primera_compra,
+			timestampdiff(month, a.primera_orden, b.fecha_orden) as periodo,
+			count(distinct a.nombre_cliente) as clientes_retenidos
+	from
+	(
+		select 	nombre_cliente,
+				min(fecha_orden) as primera_orden,
+				first_value(categoria) over (partition by nombre_cliente order by fecha_orden) as categoria_primera_compra
+		from 	cohort.supertienda
+		group by 1
+	) as a
+	inner join cohort.supertienda as b on a.nombre_cliente=b.nombre_cliente
+	group by 1,2
+) as c
+group by 1,2;
+/*
+categoria_primera_compra	periodo	clientes_retenidos	tamanio_cohorte	porcentaje_retencion
+Muebles	0	285	285	100.0000
+Muebles	1	23	285	8.0702
+Muebles	2	22	285	7.7193
+Muebles	3	25	285	8.7719
+Muebles	4	22	285	7.7193
+...
+*/
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* 4-6 Calculo en Fechas Diferentes */
 
