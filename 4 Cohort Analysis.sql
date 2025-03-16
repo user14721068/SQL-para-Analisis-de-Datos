@@ -951,5 +951,5 @@ fecha	siglo_primer_periodo	poblacion_parcial	poblacion_total	porcentaje
 ...
 */
 
-/* Este deglose se puede realizar para cualquier categoría */
+/* Este desglose se puede realizar para cualquier categoría */
 
