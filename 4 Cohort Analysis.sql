@@ -12,7 +12,7 @@ Métrica agregada: Cómo mediremos a las personas de la cohorte, pueden ser vent
 Temas:
 Análisis de retención: Si cada miembro de una generación está presenta en una fecha en particular de nuestro estudio.
 Análisis de superviviencia: Cuanta gente de una generación sobrevive después de cierto tiempo.
-Análisis de devolución: Si una acción ha sucedido más de n veces en un periodo de tiempo dado. Por ejemplo, cuantas veces nos compra un cliente en un periodo de tiempo.
+Análisis de retorno: Si una acción ha sucedido más de n veces en un periodo de tiempo dado. Por ejemplo, cuantas veces nos compra un cliente en un periodo de tiempo.
 Análisis Acumulativos: A lo largo de la vida del cliente, cuento dinero ha gastado con nosotros.
 */
 
@@ -450,4 +450,506 @@ Muebles	4	22	285	7.7193
 */
 
 /* 4-6 Calculo en Fechas Diferentes */
+
+/* En el capitulo anterior se vio el caso de una cohorte definida por la fecha de compra del primer producto. 
+Ahora se definirá la cohorte a partir de una fecha fija que sea de interés para un estudio */
+
+/* Vista previa de la tabla legisladoresusa */
+select 	*
+from cohort.legisladoresusa 
+limit 5;
+/*
+legisladoresusa_id	IDLegislador	DipSen	InicioPeriodo	FinPeriodo	Estado
+1	B000944	rep	1993-01-05 00:00:00	1995-01-03 00:00:00	OH
+2	C000127	rep	1993-01-05 00:00:00	1995-01-03 00:00:00	WA
+3	C000141	rep	1987-01-06 00:00:00	1989-01-03 00:00:00	MD
+4	C000174	rep	1983-01-03 00:00:00	1985-01-03 00:00:00	DE
+5	C001070	sen	2007-01-04 00:00:00	2013-01-03 00:00:00	PA
+...
+*/
+
+/* Obtener los diputados o senadores que estuvieron activos en algún momento del año 2000 */
+select 	IDLegislador,
+		DipSen,
+		date("2000-01-01") as inicio_cohorte,
+        min(InicioPeriodo) as inicio_periodo
+from 	cohort.legisladoresusa
+where 	InicioPeriodo<="2000-12-31" and FinPeriodo>="2000-01-01"
+group by 1,2,3;
+/*
+IDLegislador	DipSen	inicio_cohorte	inicio_periodo
+C001035	sen	2000-01-01	1997-01-07 00:00:00
+E000285	sen	2000-01-01	1997-01-07 00:00:00
+U000039	rep	2000-01-01	1999-01-06 00:00:00
+B001230	rep	2000-01-01	1999-01-06 00:00:00
+L000557	rep	2000-01-01	1999-01-06 00:00:00
+...
+*/
+
+/* Agregar los datos de la consulta anterior a la tabla legisladoresusa */
+SELECT 	*
+FROM
+(
+	select IDLegislador,
+			DipSen,
+			date("2000-01-01") as inicio_cohorte,
+			min(InicioPeriodo) as inicio_periodo
+	from 	cohort.legisladoresusa
+	where 	InicioPeriodo<="2000-12-31" and FinPeriodo>="2000-01-01"
+	group by 1,2,3
+) as a
+inner join cohort.legisladoresusa as b on a.IDLegislador=b.IDLegislador 
+	and b.InicioPeriodo >= a.inicio_periodo;
+/*
+IDLegislador	DipSen	inicio_cohorte	inicio_periodo	legisladoresusa_id	IDLegislador	DipSen	InicioPeriodo	FinPeriodo	Estado
+C001035	sen	2000-01-01	1997-01-07 00:00:00	18	C001035	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	ME
+E000285	sen	2000-01-01	1997-01-07 00:00:00	22	E000285	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	WY
+U000039	rep	2000-01-01	1999-01-06 00:00:00	32	U000039	rep	1999-01-06 00:00:00	2001-01-03 00:00:00	NM
+B001230	rep	2000-01-01	1999-01-06 00:00:00	40	B001230	rep	1999-01-06 00:00:00	2001-01-03 00:00:00	WI
+L000557	rep	2000-01-01	1999-01-06 00:00:00	153	L000557	rep	1999-01-06 00:00:00	2001-01-03 00:00:00	CT
+...
+*/
+
+
+
+/* Con la consulta anterior rellenar las fechas intermedias entre inicio periodo y fin periodo usando la tabla auxiliar "tablafechas" */
+SELECT 	*,
+		timestampdiff(year,a.inicio_cohorte,c.fecha) as periodo
+FROM
+(
+	select IDLegislador,
+			DipSen,
+			date("2000-01-01") as inicio_cohorte,
+			min(InicioPeriodo) as inicio_periodo
+	from 	cohort.legisladoresusa
+	where 	InicioPeriodo<="2000-12-31" and FinPeriodo>="2000-01-01"
+	group by 1,2,3
+) as a
+inner join cohort.legisladoresusa as b on a.IDLegislador=b.IDLegislador and b.InicioPeriodo >= a.inicio_periodo
+left join cohort.tablafechas as c on c.fecha between b.InicioPeriodo and b.FinPeriodo and c.year >= 2000   /*Crear una fila para cada fecha en la tabla fechas si la fecha esta entre el inicio_periodo y fin_periodo del legislador, conservar solo del 2000 en adelante.*/
+where timestampdiff(year,a.inicio_cohorte,c.fecha) IS NOT NULL;
+/*
+IDLegislador	DipSen	inicio_cohorte	inicio_periodo	legisladoresusa_id	IDLegislador	DipSen	InicioPeriodo	FinPeriodo	Estado	Year	Mes	Dia	Dias_en_Year	Fecha
+C001035	sen	2000-01-01	1997-01-07 00:00:00	18	C001035	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	ME	2000	12	31	366	2000-12-31
+C001035	sen	2000-01-01	1997-01-07 00:00:00	18	C001035	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	ME	2001	12	31	365	2001-12-31
+C001035	sen	2000-01-01	1997-01-07 00:00:00	18	C001035	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	ME	2002	12	31	365	2002-12-31
+E000285	sen	2000-01-01	1997-01-07 00:00:00	22	E000285	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	WY	2000	12	31	366	2000-12-31
+E000285	sen	2000-01-01	1997-01-07 00:00:00	22	E000285	sen	1997-01-07 00:00:00	2003-01-03 00:00:00	WY	2001	12	31	365	2001-12-31
+...
+*/
+
+
+/* Con la consulta anterior calcular el periodo en años a partir del año 2000 y el numero de legisladores en cada periodo */
+select 	a.dipsen,
+		timestampdiff(year,a.inicio_cohorte,c.fecha) as periodo,
+        count(distinct a.IDLegislador) as cohorte_retenida
+from
+(
+	select IDLegislador,
+			DipSen,
+			date("2000-01-01") as inicio_cohorte,
+			min(InicioPeriodo) as inicio_periodo
+	from 	cohort.legisladoresusa
+	where 	InicioPeriodo<="2000-12-31" and FinPeriodo>="2000-01-01"
+	group by 1,2,3
+) as a
+inner join cohort.legisladoresusa as b on a.IDLegislador=b.IDLegislador and b.InicioPeriodo >= a.inicio_periodo
+left join cohort.tablafechas as c on c.fecha between b.InicioPeriodo and b.FinPeriodo and c.year >= 2000
+where timestampdiff(year,a.inicio_cohorte,c.fecha) IS NOT NULL
+group by 1,2;
+/*
+dipsen	periodo	cohorte_retenida
+rep	0	439
+rep	1	392
+rep	2	389
+rep	3	340
+rep	4	338
+rep	5	308
+...
+*/
+
+
+
+/* Con la consulta anterior calcular el porcentaje respecto del año de inicio de la cohorte */
+select 	dipsen,
+		periodo,
+        cohorte_retenida,
+        first_value(cohorte_retenida) over (partition by dipsen order by periodo) as cohorte_inicial,
+        100 * cohorte_retenida / first_value(cohorte_retenida) over (partition by dipsen order by periodo) as porcentaje_retencion
+from
+(
+		select 	a.dipsen,
+				coalesce(timestampdiff(year,a.inicio_cohorte,c.fecha),0) as periodo,
+				count(distinct a.IDLegislador) as cohorte_retenida
+		from
+		(
+			select IDLegislador,
+					DipSen,
+					date("2000-01-01") as inicio_cohorte,
+					min(InicioPeriodo) as inicio_periodo
+			from 	cohort.legisladoresusa
+			where 	InicioPeriodo<="2000-12-31" and FinPeriodo>="2000-01-01"
+			group by 1,2,3
+		) as a
+		inner join cohort.legisladoresusa as b on a.IDLegislador=b.IDLegislador and b.InicioPeriodo >= a.inicio_periodo
+		left join cohort.tablafechas as c on c.fecha between b.InicioPeriodo and b.FinPeriodo and c.year >= 2000
+		group by 1,2
+) as b;
+/*
+dipsen	periodo	cohorte_retenida	cohorte_inicial	porcentaje_retencion
+rep	0	440	440	100.0000
+rep	1	392	440	89.0909
+rep	2	389	440	88.4091
+rep	3	340	440	77.2727
+rep	4	338	440	76.8182
+rep	5	308	440	70.0000
+...
+*/
+
+
+/* 4-7 Analisis de Supervivencia */
+
+/* Por legislador, obtener el siglo en que inicio su periodo, la fecha de inicio de su primer periodo, la fecha de inicio de su ultimo periodo y años de permanencia */
+SELECT 	idlegislador,
+		FLOOR((year(min(inicioperiodo))+99)/100) as siglo,
+		min(inicioperiodo) as primer_periodo,
+		max(inicioperiodo) as ultimo_periodo,
+        timestampdiff(year,min(inicioperiodo),max(inicioperiodo)) as permanencia
+FROM	cohort.legisladoresusa
+GROUP BY 1
+ORDER BY permanencia;
+/*
+idlegislador	siglo	primer_periodo	ultimo_periodo	permanencia
+H000293	20	1945-02-15 00:00:00	1945-02-15 00:00:00	0
+H000426	20	1945-01-03 00:00:00	1945-01-03 00:00:00	0
+H000515	20	1945-01-03 00:00:00	1945-01-03 00:00:00	0
+H000682	20	1945-01-03 00:00:00	1945-01-03 00:00:00	0
+H000913	20	1945-10-08 00:00:00	1945-10-08 00:00:00	0
+...
+*/
+
+
+/* Con la consulta anterior, agrupar por siglo y obtener el numero y porcentaje de legisladores que estuvieron 10 o más años */
+SELECT 	siglo,
+		COUNT(distinct idlegislador) AS cohorte_inicial,
+        COUNT(distinct case when permanencia>=10 then idlegislador end) AS mas_de_10_anios,
+        COUNT(distinct case when permanencia>=10 then idlegislador end) / COUNT(distinct idlegislador) AS porcentaje
+FROM
+(
+		SELECT 	idlegislador,
+				FLOOR((year(min(inicioperiodo))+99)/100) as siglo,
+				min(inicioperiodo) as primer_periodo,
+				max(inicioperiodo) as ultimo_periodo,
+				timestampdiff(year,min(inicioperiodo),max(inicioperiodo)) as permanencia
+		FROM	cohort.legisladoresusa
+		GROUP BY 1
+		ORDER BY permanencia
+) AS A
+GROUP BY 1;
+/*
+siglo	cohorte_inicial	mas_de_10_anios	porcentaje
+18	368	83	0.2255
+19	6299	892	0.1416
+20	5091	1853	0.3640
+21	760	119	0.1566
+...
+*/
+
+/* Analisis de retorno de clientes */
+
+/* Desglosado por año, obtener cuantos de mis clientes hicieron su primera compra en articulos de oficina */
+SELECT 	YEAR(primer_orden) as cohort_anual,
+		count(distinct nombre_cliente) as oficina
+FROM
+(
+	SELECT 	nombre_cliente,
+			min(fecha_orden) as primer_orden
+	FROM 	cohort.supertienda
+	where 	categoria = "Suministros de oficina"
+	group by 1
+) as A
+GROUP BY 1;
+/*
+cohort_anual	oficina
+2019	518
+2020	169
+2021	83
+2022	23
+...
+*/
+
+/* Con la consulta anterior, obtener desglosado por año, el numero de clientes cuya primera compra fue en articulos de oficina y posteriormente vuelven para comprar articulos de tecnologia */
+SELECT 	year(a.primer_orden) as anio_cohorte,
+		count(distinct b.nombre_cliente) as oficina_tecnologia
+FROM
+(
+	SELECT 	nombre_cliente,
+			min(fecha_orden) as primer_orden
+	FROM 	cohort.supertienda
+	where 	categoria = "Suministros de oficina"
+	group by 1
+) as a
+INNER JOIN cohort.supertienda as b on a.nombre_cliente = b.nombre_cliente
+WHERE b.Categoria="Tecnología" AND b.Fecha_Orden > a.primer_orden
+GROUP BY 1;
+/*
+year(a.primer_orden)	oficina_tecnologia
+2019	424
+2020	128
+2021	53
+2022	8
+*/
+
+/* Con la consulta anterior obtener el porcentaje de clientes que compraron primero articulos de oficina y regresan en un tiempo futuro por articulos de tecnologia */
+SELECT 	AA.anio_cohorte,
+		AA.oficina,
+		BB.oficina_tecnologia,
+        BB.oficina_tecnologia / AA.oficina AS porcentaje
+		
+FROM
+	(SELECT 	year(a.primer_orden) as anio_cohorte,
+			count(distinct a.nombre_cliente) as oficina
+	FROM
+	(
+		SELECT 	nombre_cliente,
+				min(fecha_orden) as primer_orden
+		FROM 	cohort.supertienda
+		where 	categoria = "Suministros de oficina"
+		group by 1
+	) as a
+	GROUP BY 1
+) AS AA
+LEFT JOIN
+(
+	SELECT 	year(a.primer_orden) as anio_cohorte,
+			count(distinct b.nombre_cliente) as oficina_tecnologia
+	FROM
+	(
+		SELECT 	nombre_cliente,
+				min(fecha_orden) as primer_orden
+		FROM 	cohort.supertienda
+		where 	categoria = "Suministros de oficina"
+		group by 1
+) as a
+INNER JOIN cohort.supertienda as b on a.nombre_cliente = b.nombre_cliente
+WHERE b.Categoria="Tecnología" AND b.Fecha_Orden > a.primer_orden
+GROUP BY 1
+) AS BB 
+ON AA.anio_cohorte = BB.anio_cohorte;
+/*
+anio_cohorte	oficina	oficina_tecnologia	porcentaje
+2019	518	424	0.8185
+2020	169	128	0.7574
+2021	83	53	0.6386
+2022	23	8	0.3478
+*/
+
+/* En los ejemplos anteriores solo se pidio que el cliente regresara pero no se especifica en cuantos periodos deberia de regresar */
+
+/* Con la consulta anterior obtener el porcentaje de clientes que compraron primero articulos de oficina y en 12 meses o menos regresan por articulos de tecnologia */
+SELECT 	AA.anio_cohorte,
+		AA.oficina,
+		BB.oficina_tecnologia,
+        BB.oficina_tecnologia / AA.oficina AS porcentaje
+		
+FROM
+(
+	SELECT 	year(a.primer_orden) as anio_cohorte,
+			count(distinct a.nombre_cliente) as oficina
+	FROM
+	(
+		SELECT 	nombre_cliente,
+				min(fecha_orden) as primer_orden
+		FROM 	cohort.supertienda
+		where 	categoria = "Suministros de oficina"
+		group by 1
+	) as a
+	GROUP BY 1
+) AS AA
+LEFT JOIN
+(
+	SELECT 	year(a.primer_orden) as anio_cohorte,
+			count(distinct b.nombre_cliente) as oficina_tecnologia
+	FROM
+	(
+		SELECT 	nombre_cliente,
+				min(fecha_orden) as primer_orden
+		FROM 	cohort.supertienda
+		where 	categoria = "Suministros de oficina"
+		group by 1
+	) as a
+	INNER JOIN cohort.supertienda as b on a.nombre_cliente = b.nombre_cliente
+	WHERE b.Categoria="Tecnología" AND b.Fecha_Orden > a.primer_orden AND timestampdiff(MONTH,a.primer_orden,b.fecha_orden) <= 12
+	GROUP BY 1
+) AS BB 
+ON AA.anio_cohorte = BB.anio_cohorte;
+/*
+anio_cohorte	oficina	oficina_tecnologia	porcentaje
+2019	518	166	0.3205
+2020	169	69	0.4083
+2021	83	40	0.4819
+2022	23	8	0.3478
+*/
+
+
+/* Calculos Acumulados */
+
+/* Desglosado por cliente, obtener la categoria de su primera orden, fecha de su primera orden y obtener la fecha 10 meses despues de su primera orden */
+select 	distinct nombre_cliente,
+		first_value(categoria) over (partition by nombre_cliente order by fecha_orden asc) as primera_categoria,
+        min(fecha_orden) over (partition by nombre_cliente) as primera_orden,
+        min(fecha_orden) over (partition by nombre_cliente) + interval 10 month as primeros_10_meses
+from 	cohort.supertienda;
+/*
+nombre_cliente	primera_categoria	primera_orden	primeros_10_meses
+Aaron Bergman	Suministros de Oficina	2019-02-18	2019-12-18
+Aaron Hawkins	Suministros de Oficina	2019-04-22	2020-02-22
+Aaron Smayling	Suministros de Oficina	2019-07-27	2020-05-27
+Adam Bellavance	Suministros de Oficina	2020-09-18	2021-07-18
+Adam Hart	Suministros de Oficina	2019-11-16	2020-09-16
+...
+*/
+
+/* Desglosado por año y primera categoria de compra, calcular el numero de compradores inicial, el numero de ordenes, las ordenes promedio por cliente, la suma de ventas y venta promedio */
+select 	extract(year from a.primera_orden) as anio,
+		primera_categoria,
+        count(distinct a.nombre_cliente) as poblacion_inicial,
+        count(b.fecha_orden) as ordenes,
+        count(b.fecha_orden) / count(distinct a.nombre_cliente) as ordenes_por_cliente,
+        round(sum(b.ventas),2) as ventas_acumuladas,
+        round(sum(b.ventas) / count(distinct a.nombre_cliente),2) as venta_promedio
+from
+(
+	select 	distinct nombre_cliente,
+			first_value(categoria) over (partition by nombre_cliente order by fecha_orden asc) as primera_categoria,
+			min(fecha_orden) over (partition by nombre_cliente) as primera_orden,
+			min(fecha_orden) over (partition by nombre_cliente) + interval 10 month as primeros_10_meses
+	from 	cohort.supertienda
+) as a
+LEFT JOIN cohort.supertienda as b on a.nombre_cliente = b.nombre_cliente 
+AND b.fecha_orden between a.primera_orden and a.primeros_10_meses
+group by 1,2;
+/*
+anio	primera_categoria	poblacion_inicial	ordenes	ordenes_por_cliente	ventas_acumuladas	venta_promedio
+2019	Muebles	216	1013	4.6898	309671.54	1433.66
+2019	Suministros de Oficina	339	1253	3.6962	216083.06	637.41
+2019	Tecnología	50	171	3.4200	44316.91	886.34
+2020	Muebles	38	212	5.5789	47505.20	1250.14
+2020	Suministros de Oficina	79	287	3.6329	57412.51	726.74
+...
+*/
+
+
+/* 4-10 Analisis Transversal mediante Cohorte */
+
+/* Obtener el numero de legisladores por año */
+select 	b.fecha,
+		count(distinct a.idlegislador) as legisladores
+from cohort.legisladoresusa as a
+inner join cohort.tablafechas as b on b.Fecha between a.InicioPeriodo and a.FinPeriodo
+group by 1;
+/*
+fecha	legisladores
+1789-12-31	89
+1790-12-31	95
+1791-12-31	99
+1792-12-31	101
+1793-12-31	141
+1794-12-31	140
+...
+*/
+
+/* Obtener el id del legislador y la fecha de su primer periodo y siglo de su primer periodo */
+select 	IDLegislador,
+		min(InicioPeriodo) as primer_periodo,
+        floor((year(min(InicioPeriodo))+99)/100) as siglo_primer_periodo
+from cohort.legisladoresusa
+group by 1;
+/*
+IDLegislador	primer_periodo	siglo_primer_periodo
+B000944	1993-01-05 00:00:00	1993
+C000127	1993-01-05 00:00:00	1993
+C000141	1987-01-06 00:00:00	1987
+C000174	1983-01-03 00:00:00	1983
+C001070	2007-01-04 00:00:00	2007
+...
+*/
+
+/* Usar las 2 consultas anteriores para obtener el numero de legisladores por siglo de su primer periodo y por cada fecha de la tabla fechas*/
+select 	siglo_primer_periodo,
+		b.fecha,
+        count(distinct a.IDLegislador) as legisladores
+from cohort.legisladoresusa as a
+inner join cohort.tablafechas as b on b.Fecha between a.InicioPeriodo and a.FinPeriodo
+inner join 
+(
+	select 	IDLegislador,
+			min(InicioPeriodo) as primer_periodo,
+			floor((year(min(InicioPeriodo))+99)/100) as siglo_primer_periodo
+	from cohort.legisladoresusa
+	group by 1
+) as c on c.idlegislador = a.idlegislador
+group by 1,2;
+/*
+siglo_primer_periodo	fecha	legisladores
+18	1789-12-31	89
+18	1790-12-31	95
+18	1791-12-31	99
+18	1792-12-31	101
+18	1793-12-31	141
+18	1794-12-31	140
+...
+*/
+
+/* Obtener deglosado por fecha y siglo del primer periodo, el numero parcial de legisladores por inicio de su primer periodo, el total de legisladores de ese año y el porcentaje de cada siglo */
+select 	fecha,
+		siglo_primer_periodo,
+        legisladores as poblacion_parcial,
+        sum(legisladores) over (partition by fecha) as poblacion_total,
+		legisladores / sum(legisladores) over (partition by fecha) as porcentaje
+from
+(
+select 	siglo_primer_periodo,
+		b.fecha,
+        count(distinct a.IDLegislador) as legisladores
+from cohort.legisladoresusa as a
+inner join cohort.tablafechas as b on b.Fecha between a.InicioPeriodo and a.FinPeriodo
+inner join 
+(
+	select 	IDLegislador,
+			min(InicioPeriodo) as primer_periodo,
+			floor((year(min(InicioPeriodo))+99)/100) as siglo_primer_periodo
+	from cohort.legisladoresusa
+	group by 1
+) as c on c.idlegislador = a.idlegislador
+group by 1,2
+) as d;
+/*
+fecha	siglo_primer_periodo	poblacion_parcial	poblacion_total	porcentaje
+1789-12-31	18	89	89	1.0000
+1790-12-31	18	95	95	1.0000
+1791-12-31	18	99	99	1.0000
+1792-12-31	18	101	101	1.0000
+1793-12-31	18	141	141	1.0000
+1794-12-31	18	140	140	1.0000
+1795-12-31	18	145	145	1.0000
+1796-12-31	18	150	150	1.0000
+1797-12-31	18	152	152	1.0000
+1798-12-31	18	155	155	1.0000
+1799-12-31	18	148	148	1.0000
+1800-12-31	18	151	151	1.0000
+1801-12-31	18	97	154	0.6299
+1801-12-31	19	57	154	0.3701
+1802-12-31	18	92	151	0.6093
+1802-12-31	19	59	151	0.3907
+1803-12-31	18	68	184	0.3696
+1803-12-31	19	116	184	0.6304
+1804-12-31	18	71	188	0.3777
+1804-12-31	19	117	188	0.6223
+1805-12-31	18	54	188	0.2872
+1805-12-31	19	134	188	0.7128
+...
+*/
+
+/* Este deglose se puede realizar para cualquier categoría */
 
