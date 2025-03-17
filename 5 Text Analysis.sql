@@ -175,11 +175,12 @@ año	mes	conteo
 /* Usar la funcion substring_index para obtener rating, fecha, pais de origen */
 select 	substring_index(substring_index(information,", Year_Month: ",1),"Rating: ",-1) as rating,
 		substring_index(substring_index(information,", Reviewer_Location: ",1),", Year_Month: ",-1) as fecha,
+        substring_index(substring_index(substring_index(information,", Reviewer_Location: ",1),", Year_Month: ",-1),"-",1) as año,
+        substring_index(substring_index(substring_index(information,", Reviewer_Location: ",1),", Year_Month: ",-1),"-",-1) as mes,
         substring_index(substring_index(information,", Review_Text: ",1),", Reviewer_Location: ",-1) as pais_origen,
         substring_index(substring_index(information,", Branch: ",1),", Review_Text: ",-1) as comentario,
         substring_index(information,", Branch: ",1) as parque
-from analisistexto.disneyrew
-limit 5
+from analisistexto.disneyrew;
 /*
 rating	fecha	pais_origen	comentario	parque
 4	2019-4	Australia	If you've ever been to Disneyland anywhere you'll find Disneyland Hong Kong very similar in the layout when you walk into main street! It has a very familiar feel. One of the rides  its a Small World  is absolutely fabulous and worth doing. The day we visited was fairly hot and relatively busy but the queues moved fairly well. Branch: Disneyland_HongKong	Rating: 4, Year_Month: 2019-4, Reviewer_Location: Australia, Review_Text: If you've ever been to Disneyland anywhere you'll find Disneyland Hong Kong very similar in the layout when you walk into main street! It has a very familiar feel. One of the rides  its a Small World  is absolutely fabulous and worth doing. The day we visited was fairly hot and relatively busy but the queues moved fairly well. Branch: Disneyland_HongKong
@@ -190,14 +191,52 @@ rating	fecha	pais_origen	comentario	parque
 ...
 */
 
-
 /* 5-8 Transformacion de Texto */
 
+/* Funciones Upper, Lower, Trim */
+select	upper("Hola amigos") as upper,							/* Convierte una cadena a mayusculas */
+		lower("Hola amigos") as lower,							/* Convierte una cadena a minusculas */
+		trim("    Hola amigos     ") as trim,					/* Elimina espacios en blanco al inicio y final de una cadena */
+        trim(leading "$" from "$$Hola amigos") as trim2, 		/* Elimina un caracter inicial que le especifiquemos de una cadena de texto */
+        replace("Hola amigos","Hola","Holi") as reemplazar;		/* Permite sustituir una cadena de texto por otra dentro de una string */
+/*
+upper	lower	trim	trim2	reemplazar
+HOLA AMIGOS	hola amigos	Hola amigos	Hola amigos	Holi amigos
+*/
 
 
-
-
-
+/* 	Usar la funcion trim para eliminar espacios en blanco de la columna comentario.
+	Crear una nueva tabla para guardar el resultado de esta consulta.
+	Convertir la columna rating a entero sin signo.
+    Convertir la columna año a entero sin signo.
+    Convertir la columna mes a entero sin signo.
+    Reemplazar el nombre de país.
+    
+*/
+create table analisistexto.disneyclean as
+select	convert(rating,unsigned int) as rating,
+		case
+			when año="missing" then null
+            else convert(año,unsigned int)
+		end as año,
+		case
+			when mes="missing" then null
+            else convert(mes,unsigned int)
+		end as mes,
+        replace(replace(replace(pais_origen,"United States","US"),"United Kingdom","UK"),"United Arab Emirates","UAE") as pais_origen,
+        trim(comentario) as comentario,
+        parque
+from
+(
+	select 	substring_index(substring_index(information,", Year_Month: ",1),"Rating: ",-1) as rating,
+			substring_index(substring_index(information,", Reviewer_Location: ",1),", Year_Month: ",-1) as fecha,
+			substring_index(substring_index(substring_index(information,", Reviewer_Location: ",1),", Year_Month: ",-1),"-",1) as año,
+			substring_index(substring_index(substring_index(information,", Reviewer_Location: ",1),", Year_Month: ",-1),"-",-1) as mes,
+			substring_index(substring_index(information,", Review_Text: ",1),", Reviewer_Location: ",-1) as pais_origen,
+			substring_index(substring_index(information,", Branch: ",1),", Review_Text: ",-1) as comentario,
+			substring_index(information,", Branch: ",1) as parque
+	from analisistexto.disneyrew
+) as a;
 
 
 
