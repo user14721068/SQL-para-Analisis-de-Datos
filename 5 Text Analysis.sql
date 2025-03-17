@@ -207,7 +207,6 @@ HOLA AMIGOS	hola amigos	Hola amigos	Hola amigos	Holi amigos
 
 /* 	Crear una nueva tabla para guardar el resultado de esta consulta.
 	Usar la funcion trim para eliminar espacios en blanco de la columna comentario.
-	
 	Convertir la columna rating a entero sin signo.
     Convertir la columna año a entero sin signo.
     Convertir la columna mes a entero sin signo.
