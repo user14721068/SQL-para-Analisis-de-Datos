@@ -238,9 +238,285 @@ from
 	from analisistexto.disneyrew
 ) as a;
 
+/* 5-9 Busquedas con Comodin */
+
+/* Funcion LIKE */
+select 	"Daniel Perez Gonzalez"	LIKE "Go" 		as e1, 		/* Devuelve 0. Busca coincidencia exacta entre las dos cadenas.*/
+		"Daniel Perez Gonzalez"	NOT LIKE "Go" 	as e2, 		/* Devuelve 1. Busca la NO coincidencia exacta entre las dos cadenas.*/
+		"Daniel Perez Gonzalez"	LIKE "%on%" 	as e3, 		/* Devuelve 1. Busca que la cadena empiece con texto cualquiera seguida de la cadena "on" seguida de texto cualquiera.*/
+		"Daniel Perez Gonzalez" LIKE "d%" 		as e4,		/* Devuelve 1. Busca que la cadena empiece con la palabra "d" seguida de texto cualquiera.*/
+		"Daniel Perez Gonzalez" LIKE "P%" 		as e5,		/* Devuelve 0. Busca que la cadena empiece con la palabra "P" seguida de texto cualquiera.*/
+		"Daniel Perez Gonzalez" LIKE "%Z" 		as e6,		/* Devuelve 1. Busca que la cadena empiece con texto cualquiera y termine con "z".*/
+		"Daniel Perez Gonzalez" LIKE "%el" 		as e7,		/* Devuelve 0. Busca que la cadena empiece con texto cualquiera y termine con "el".*/
+		"Daniel Perez Gonzalez" LIKE "_a%" 		as e8,		/* Devuelve 1. Busca que la cadena empiece con 1 caracter cualquiera, seguida de la letra "l" seguido de texto cualquiera.*/
+		"Daniel Perez Gonzalez" LIKE "_e%" 		as e9;		/* Devuelve 0. Busca que la cadena empiece con 1 caracter cualquiera, seguida de la letra "e" seguido de texto cualquiera.*/
+/*
+e1	e2	e3	e4	e5	e6	e7	e8	e9
+0	1	1	1	0	1	0	1	1
+*/
 
 
+/* Contar el número de reseñas que contengan la palabra "grandson" */
+select	count(*) 
+from 	analisistexto.disneyclean
+where 	comentario like "%grandson%";
+/*
+count(*)
+241
+*/
+
+/* Contar el número de reseñas que no contengan la palabra "grandson" */
+select	count(*) 
+from 	analisistexto.disneyclean
+where 	comentario not like "%grandson%";
+/*
+count(*)
+42415
+*/
+
+/* Conteo de comentarios qu contegan la palabra son o daughter */
+select count(*)
+from analisistexto.disneyclean
+where comentario like "%daughter%" or comentario like "%son%";
+/*
+count(*)
+9922
+*/
+
+/* Contar los comentarios que contienen la palabra wife y contienen las palabras son o daugther */
+select count(*)
+from analisistexto.disneyclean
+where comentario like "%wife%" and (comentario like "%son%" or comentario like "%daughter%" );
+/*
+count(*)
+540
+*/
+
+/* Contar los comentarios de acuerdo a si contienen alguna de las siguientes palabras */
+select 	case 	when comentario like "%love%" 		then "aman"
+				when comentario like "%fabulous%" 	then "fabuloso"
+                when comentario like "%like%" 		then "gusta"
+                when comentario like "%good%" 		then "bien"
+				when comentario like "%bad%" 		then "malo"
+                when comentario like "%expensive%" 	then "caro"
+                when comentario like "%boring%" 	then "aburrido"
+                else "ninguno"
+			end as sentimiento,
+		count(*)
+from analisistexto.disneyclean
+group by 1
+order by 1 desc;
+/*
+sentimiento	count(*)
+ninguno	16622
+malo	947
+gusta	6907
+fabuloso	413
+caro	1853
+bien	4958
+aman	10863
+aburrido	93
+*/
+
+/* Obtener la tabla considerando que puede haber comentarios que contenga una o mas palabras */
+select 	comentario like "%love%" as "aman",
+		comentario like "%like%" as "gusta",
+		comentario like "%bad%"  as "malo",
+        count(*)
+from analisistexto.disneyclean
+group by 1,2,3
+order by 1,2,3;
+/*
+aman	gusta	malo	count(*)
+0	0	0	23431
+0	0	1	1370
+0	1	0	6366
+0	1	1	626
+1	0	0	7398
+1	0	1	460
+1	1	0	2591
+1	1	1	414
+*/
+
+/* 5-10 Busqueda Exacta */
+
+/* Extraer la primera palabra del comentario y verificar si coincide con una lista de palabras dada */
+
+select *
+from
+(
+	select 	substring_index(comentario," ",1) as primera_palabra,
+			comentario
+	from analisistexto.disneyclean
+) as Z
+where primera_palabra in ("Amazing","Great","Fun","Small","Disgusting");
+/*
+primera_palabra	comentario
+Great	Great place! Your day will go by and you won't even know it. Obviously went there for my daughter and she absolutely loved it! Too bad the parade got canceled though. Branch: Disneyland_HongKong
+Small	Small disneyland catering to kids, but they have some nice rides including the new Ant Man ride. Pricey food and somewhat long queues but that is part of the theme park. Try to go in the morning and then again in the evening, best is to stay one day at the hotel to maximize the park. Branch: Disneyland_HongKong
+Great	Great fun for the family.  The fact that it is a smaller park than other Disney   s is a plus.  Facilities seem new and loads of different games. Branch: Disneyland_HongKong
+great	great way to spend a day in Hong kong as a tourist, easy to wander through the park and lots of fun, overall good value, found some good souvenirs along the way..food a little expensive as is with most parks a should do if your over that way Branch: Disneyland_HongKong
+Amazing	Amazing  The shows  Everything was amazing  If u are a Disney fan you should visit   Is in fact a must and if u didnt do it then ur missing out Branch: Disneyland_HongKong
+...
+*/
 
 
+/* 5-11 Expresiones Regulares */
+
+/* Busqueda de una palabra dentro de texto */
+select 	"Los datos son de disney" regexp "Disney" as busqueda,
+		"Los datos son de disney" regexp "e" as busqueda;
+/*
+busqueda1 busqueda2
+1 	1
+*/
+
+/* Negación de busqueda de una palabra dentro de texto */
+select "Los datos son de disney" not regexp "Disney" as busqueda;
+/*
+busqueda
+0
+*/
+
+/* Busqueda de una palabra que esté contenida en el texto pero no al inicio del texto */
+select 	"Los datos son de disney" regexp ".disney" as busqueda1,
+		"Los datos son de disney" regexp ".los" as busqueda2;
+/*
+busqueda1 busqueda2
+1 0
+*/
+
+/* Busqueda de palabras con distintas iniciales */
+select 	"Los datos son de disney" regexp "[abcdef]isney" 	as busqueda1,  /*Buscar aisney o disney  ... o fisney */
+		"Los datos son de disney" regexp "[abcdef]" 		as busqueda2;  /*Buscar a o b o c o d o e o f*/
+/*
+busqueda1 busqueda2
+1	1
+*/
+
+/* Buscar cualquier letra del entre la a y la z */
+select "Los datos son de disney" regexp "[a-z]" as busqueda;
+/*
+busqueda1 
+1
+*/
+
+/* Buscar cualquier numero entre un rango de numeros */
+select 	"5 minutos en el parque" regexp "[1-5]" as busqueda1,
+		"5 minutos en el parque" regexp "[1-3]" as busqueda2,
+        "5 minutos en el parque" regexp "[12345]" as busqueda3;   /* Buscar 1 o 2 o 3 o 4 o 5 */
+/*
+busqueda1 	busqueda2 	busqueda3
+1	0	1
+*/
+
+/* Buscar un cadena de 3 digitos cualesquiera entre 0 y 9 en el texto */
+select "El tiempo es de 120 minutos" regexp "[0-9][0-9][0-9]" as busqueda;
+/*
+busqueda1 
+1
+*/
+
+/* Buscar una cadena que empiece con un numero del 0 al 9*/
+select "El tiempo es de 120 minutos" regexp "[0-9]+" as busqueda; 		/* El simbolo + indica que buscaremos el patron [0-9] m veces después */
+/*
+busqueda
+1
+*/
+
+/* Verificar si la frase empieza o termina con una cadena especifica */
+select 	"Los datos son de Disney" regexp "^los" as busqueda1,			/*Si la palabra empieza con "los"    */
+		"Los datos son de Disney" regexp "disney$" as busqueda2;		/*Si la palabra termina con "disney" */
+/*
+busqueda1	busqueda2
+1	1
+*/
 
 
+/* Busqueda de espacios en blanco en el texto */
+select 	"Los datos son de Disney" regexp "[:space:]" as busqueda1,
+		"Los_datos_son_de_Disney" regexp "[:space:]" as busqueda2;
+/*
+/*
+busqueda1	busqueda2
+1	0
+*/
+
+/* Busqueda de palabras solas */
+select "Si puede ser no se tal vez a lo mejor" regexp "\\bsi\\b" as busqueda;
+/*
+busqueda
+1
+*/
+
+
+/* Busqueda de patrones repetidos n veces */
+select "La contraseña debe ser de tipo 00a" regexp "[0-9]{2}[a-z]" as busqueda;
+/*
+busqueda
+1
+*/ 
+
+
+/* 5-12 Expresiones Regulares 2 */
+
+/* Busqueda de comentarios con la cadena "5 estrellas" o "4 estrellas" o ... o "1 estrella" */
+select 	regexp_substr(comentario,"[0-5] star[s ]") as calificacion
+from analisistexto.disneyclean
+where comentario regexp "[0-5] star[s ]";
+
+/* Con tabla anterior realizar un conteo de acuerdo al numero de estrellas */
+select 	regexp_substr(comentario,"[0-5] star[s]") as calificacion,
+		count(*)
+from
+(
+	select 	regexp_replace(comentario,"star[s ,.]","stars") as comentario
+	from analisistexto.disneyclean
+	where comentario regexp "[0-5] star[s ,.]"
+) as A
+group by 1
+order by 2 desc;
+/*
+calificacion	count(*)
+5 stars	169
+4 stars	58
+3 stars	31
+2 stars	21
+1 stars	10
+0 stars	4
+*/
+
+/* 5-13 Construccion de Texto */
+
+/* Concatenación de texto */
+select 	concat(rating," Rating") as rating_2
+from analisistexto.disneyclean;
+/*
+rating_2
+4 Rating
+4 Rating
+4 Rating
+4 Rating
+4 Rating
+...
+*/
+
+
+/* Concatenacion de n cadenas de texto indicando un separados */
+select concat_ws("-",año,mes,pais_origen) as texto
+from	analisistexto.disneyclean;
+/*
+texto
+2019-4-Australia
+2019-5-Philippines
+2019-4-UAE
+2019-4-Australia
+2019-4-UK
+...
+*/
+
+/* Para cada parque obtener el pais de origen de los visitantes */
+select	parque,
+		group_concat(distinct pais_origen) as pais_visitantes
+from 	analisistexto.disneyclean
+group by 1;
