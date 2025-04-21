@@ -11,7 +11,7 @@ Cuando no usar SQL: SQL no puede implementar analisis estadistico o de aprendiza
 
 /* 6-3 Detectar Anomalias por Ordenamiento */
 
-/* Este capitulo se usaran los datos de registros de tormentas  */
+/* Este capitulo se usaran datos de registros de tormentas y huracanes */
 select *
 from anomalias.storms;
 /*
