@@ -11,7 +11,7 @@ Cuando no usar SQL: SQL no puede implementar analisis estadistico o de aprendiza
 
 /* 6-3 Detectar Anomalias por Ordenamiento */
 
-/* Este capitulo se usaran datos de registros de tormentas y huracanes */
+/* Este capitulo se usaran los datos de registros de tormentas  */
 select *
 from anomalias.storms;
 /*
@@ -210,7 +210,7 @@ from
         round(std(wind) over (),4) as desv,
         round((wind - avg(wind) over ())/round(std(wind) over (),4),4) as z_score
 from anomalias.storms
-order by 1 desc) as a
+order by 1 desc) as a;
 /*
 max(z_score)	min(z_score)
 4.0284	-1.7195
@@ -218,6 +218,195 @@ max(z_score)	min(z_score)
 
 /* 6-5 Anomalias con Graficas */
 
+/* Agrupar por velocidad del viento y contar cuantos huracanes/tormentas hubo */
+select 	wind,
+		count(*)
+from anomalias.storms
+group by 1
+order by 1 desc;
+/*
+wind	count(*)
+165	1
+160	6
+155	19
+150	25
+145	36
+...
+*/
+
+/* Agrupar por velocidad del viento - presión y hacer el conteo de huracanes y/o tormentas */
+select 	wind,
+		pressure,
+		count(*)
+from anomalias.storms
+group by 1,2
+order by 1,2;
+/*
+wind	pressure	count(*)
+10	1012	4
+10	1013	2
+10	1014	1
+10	1015	2
+15	998	2
+15	999	1
+...
+*/
+
+/* 6-6 Tipos de Anomalias */
+
+/* Anomalia de valores */
+
+/* Obtener el numero de huracanes agrupando por status */
+select 	status,
+		count(*)
+from anomalias.storms
+group by 1
+order by 1 desc;
+/*
+status	count(*)
+tropical storm	7736
+tropical depression	3799
+Hurrricane	1
+hurricane	6250
+...
+*/
+
+/* Anomalia de frecuencias */
+
+select 	year,
+		count(*)
+from anomalias.storms
+group by 1
+order by 1 desc;
+/*
+year	count(*)
+2021	409
+2020	645
+2019	330
+2018	370
+2017	460
+...
+*/
 
 
+select 	location,
+		count(*)
+from anomalias.storms
+group by 1
+order by 1;
+/*
+location	count(*)
+Central of Costa Rica	737
+Central of Cuba	674
+Central of Japón	693
+Central of México	720
+Central of USA	695
+...
+*/
 
+select 	substring_index(location," of ",-1) as country,
+		count(*)
+from anomalias.storms
+group by 1
+order by 2 desc;
+/*
+country	count(*)
+Costa Rica	3689
+México	3595
+USA	3550
+Cuba	3496
+Japón	3456
+*/
+
+/* 6-7 Manejo de Anomalías */
+
+/* Después de detectar las anomalías se puede:
+   -Eliminarlas
+   -Investigarlas
+   -Reemplazarlas
+   -Re-escalarlas
+*/
+
+/* Omitir el registro del huracan con viento de 32 */
+select 	wind,
+		count(*)
+from anomalias.storms
+where wind not in (32)
+group by 1
+order by 1 desc;
+/*
+wind	count(*)
+165	1
+160	6
+155	19
+150	25
+145	36
+...
+*/
+
+/* Calcular el promedio de viento con y sin el registro 32 */
+select 	avg(wind) as promedio1,
+		avg(case
+			when wind not in (32) then wind
+			end) as promedio2
+from anomalias.storms;
+/*
+promedio1	promedio2
+56.3697	56.3711
+*/
+
+/* Calcular el porcentja de valores NA de la variable tropicalstorm_force_diameter */
+select 	case 
+			when tropicalstorm_force_diameter = "NA" then tropicalstorm_force_diameter
+			else "Not NA"
+        end as indicadora,
+		count(*)/(select count(*) from anomalias.storms) as porcentaje
+from anomalias.storms
+group by 1;
+/*
+indicadora	porcentaje
+NA 0.6208
+Not NA 0.3792
+*/
+
+/* Obtener el valor promedio de la variable tropicalstorm_force_diameter para los valores distintos a NA*/
+select avg(case when tropicalstorm_force_diameter not in ("NA") then tropicalstorm_force_diameter end) as promedio
+from anomalias.storms;
+/*
+promedio
+148.39783511269277
+*/
+
+
+/* Imputar el valor 148.39783511269277 a los registros NA */
+select 	case 
+		when  tropicalstorm_force_diameter IN ("NA") then 148.39783511269277
+        else tropicalstorm_force_diameter
+        end as tropicalstorm_force_diameter_imputed
+from anomalias.storms;
+/*
+tropicalstorm_force_diameter_imputed
+148.39783511269277
+148.39783511269277
+148.39783511269277
+148.39783511269277
+148.39783511269277
+...
+*/
+
+/* Aplicar una transformacion a la columna de velocidad del viento */
+select 	round(wind,2) as wind,
+		round(log10(round(wind,2)),2) as log10_wind,
+		count(*)
+from anomalias.storms
+group by 1,2
+order by 1 desc;
+/*
+wind	log10_wind	count(*)
+165	2.22	1
+160	2.20	6
+155	2.19	19
+150	2.18	25
+145	2.16	36
+...
+*/
