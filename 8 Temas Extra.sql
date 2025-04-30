@@ -196,7 +196,118 @@ where 	mod(storms_id,100)=86;
 
 /* 8-13 Reduccion de Dimensionalidad */
 
-/* Obtener una lista de paises que mas visitan los parques de Disney */
+/* Obtener una lista de paises que mas reseñas hacen sobre los parques de Disney */
+select 	pais_origen,
+		count(*) as reseñas
+from analisistexto.disneyclean
+group by 1
+order by 2 desc;
+/*
+pais_origen	reseñas
+US	14551
+UK	9751
+Australia	4679
+Canada	2235
+India	1511
+...
+Madagascar	1
+Democratic Republic of the Congo	1
+El Salvador	1
+Sudan	1
+Åland Islands	1
+*/
 
+/* Usando la consulta anterior, agregar una columna para rankear a los paises segun su numero de reseñas */
+select 	pais_origen,
+		count(*) as reseñas,
+        rank() over (order by count(*) desc) as ranking
+from analisistexto.disneyclean
+group by 1
+order by 2 desc;
+/*
+pais_origen	reseñas	ranking
+US	14551	1
+UK	9751	2
+Australia	4679	3
+Canada	2235	4
+India	1511	5
+...
+Madagascar	1	142
+Democratic Republic of the Congo	1	142
+El Salvador	1	142
+Sudan	1	142
+Åland Islands	1	142
+*/
 
+/* Usando la consulta anterior obtener los 5 primero paises con mas reseñas y los demas agruparlos en una categoria llamada "otros" */
+select 	pais,
+		sum(reseñas) as suma_reseñas
+from 
+(
+select 	pais_origen,
+		count(*) as reseñas,
+        rank() over (order by count(*) desc) as ranking,
+        case
+			when rank() over (order by count(*) desc) <= 5 then pais_origen
+            else "Otros"
+        end as pais
+from analisistexto.disneyclean
+group by 1
+order by 2 desc
+) as z
+group by 1;
+/*
+pais	suma_reseñas
+US	14551
+UK	9751
+Australia	4679
+Canada	2235
+India	1511
+Otros	9929
+*/
+
+/* 8-14 Datos Personales */
+
+/* De la tala supertienda obtener el total de venta por cada cliente pero omitir los datos personales del cliente */
+select 	row_number() over (order by nombre_cliente) as cliente,
+		venta_total
+from
+(
+select 	nombre_cliente,
+		round(sum(ventas),2) as venta_total
+from cohort.supertienda
+group by 1
+order by 1
+) as z;
+/*
+cliente	venta_total
+1	886.16
+2	1744.70
+3	3050.69
+4	7755.62
+5	3250.34
+...
+*/
+
+/* En MySQL, la función MD5() calcula un hash MD5 de una cadena de texto dada. Este hash es una representación hexadecimal de 32 caracteres 
+de la cadena original, y se utiliza comúnmente para verificar la integridad de datos o como una forma de almacenar contraseñas de forma 
+segura (aunque no es la forma más segura actualmente). */
+select 	md5(nombre_cliente) as cliente,
+		venta_total
+from
+(
+select 	nombre_cliente,
+		round(sum(ventas),2) as venta_total
+from cohort.supertienda
+group by 1
+order by 1
+) as z;
+/*
+cliente	venta_total
+84135027c3b09a39768e68882bb864fd	886.16
+ab04f568883700c4a24aa97febe38d5c	1744.70
+cec74cb692da20f0d53fcbdc9e662308	3050.69
+437a7a444eef025fd2ff983eaa781fb8	7755.62
+76fd68b1b36f27b8aaf5d27946ebb486	3250.34
+*/
 
